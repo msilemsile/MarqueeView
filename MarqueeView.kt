@@ -102,11 +102,8 @@ class MarqueeView : View {
         if (marqueeTime <= 0) {
             marqueeTime = 3000
         }
-        var multi: Float = marqueeNewWidth / marqueeWidth * 1.0f
-        if (multi <= 0) {
-            multi = 1.0f
-        }
-        marqueeAnimator!!.duration = (marqueeTime * multi).toLong()
+        var multi: Float = marqueeNewWidth * 1.0f / marqueeWidth * 1.0f
+        marqueeAnimator!!.duration = (marqueeTime * (1 + multi)).toLong()
         marqueeAnimator!!.repeatMode = ValueAnimator.RESTART
         marqueeAnimator!!.repeatCount = ValueAnimator.INFINITE
         marqueeAnimator!!.interpolator = LinearInterpolator()
