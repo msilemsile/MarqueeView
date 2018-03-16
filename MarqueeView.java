@@ -106,11 +106,8 @@ public class MarqueeView extends View {
         if (marqueeTime <= 0) {
             marqueeTime = 3000;
         }
-        float multi = marqueeNewWidth / marqueeWidth * 1.0f;
-        if (multi <= 0) {
-            multi = 1.0f;
-        }
-        marqueeAnimator.setDuration((long) (marqueeTime * multi));
+        float multi = marqueeNewWidth * 1.0f / marqueeWidth * 1.0f;
+        marqueeAnimator.setDuration((long) (marqueeTime * (1 + multi)));
         marqueeAnimator.setRepeatMode(ValueAnimator.RESTART);
         marqueeAnimator.setRepeatCount(ValueAnimator.INFINITE);
         marqueeAnimator.setInterpolator(new LinearInterpolator());
