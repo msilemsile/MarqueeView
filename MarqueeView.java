@@ -1,4 +1,4 @@
-package me.msile.tran.kotlintrandemo;
+package com.xk.span.zutuan.common.ui.widget;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
@@ -9,6 +9,7 @@ import android.support.annotation.Nullable;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -17,12 +18,11 @@ import android.view.animation.LinearInterpolator;
  */
 
 public class MarqueeView extends View {
-
+    private static final String TAG = "MarqueeView";
     private TextPaint tvPaint;
     private int textColor = Color.BLACK;
-    private int textSize = 14;
-    private String marqueeText = "MarqueeView";
-    private boolean isAutoRun = true;
+    private int textSize = 12;
+    private String marqueeText;
     private long marqueeTime;
     private boolean stopMarquee;
 
@@ -30,6 +30,8 @@ public class MarqueeView extends View {
     private int marqueeWidth;
 
     private ValueAnimator marqueeAnimator;
+
+    private boolean needInitAnimator;
 
     public MarqueeView(Context context) {
         super(context);
@@ -50,61 +52,62 @@ public class MarqueeView extends View {
         setWillNotDraw(false);
         tvPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         tvPaint.setColor(textColor);
-        tvPaint.setTextSize(sp2px(textSize));
+        tvPaint.setTextSize(dip2px(textSize));
     }
 
     public void setTextColor(int textColor) {
         this.textColor = textColor;
         tvPaint.setColor(textColor);
-        invalidate();
     }
 
-    public void setTextSize(int textSize) {
+    public void setTextSize(int textSize, boolean isDP) {
         this.textSize = textSize;
-        tvPaint.setTextSize(sp2px(textSize));
+        tvPaint.setTextSize(isDP ? dip2px(textSize) : sp2px(textSize));
+        requestLayout();
+    }
+
+    public void setMarqueeTime(long marqueeTime) {
+        this.marqueeTime = marqueeTime;
+        stopMarquee();
+        startMarquee();
+    }
+
+    public void setMarqueeText(String marqueeText) {
+        this.marqueeText = marqueeText;
+        stopMarquee();
+        startMarquee();
+    }
+
+    public void startMarquee() {
+        stopMarquee = false;
+        needInitAnimator = true;
+        initMarqueeAnimator();
         requestLayout();
         invalidate();
-    }
-
-    public void setAutoRun(boolean autoRun) {
-        isAutoRun = autoRun;
     }
 
     public void stopMarquee() {
         stopMarquee = true;
         if (marqueeAnimator != null) {
             marqueeAnimator.end();
+            marqueeAnimator = null;
         }
         marqueeX = 0;
-    }
-
-    public void setMarqueeText(String marqueeText) {
-        this.marqueeText = marqueeText;
-        if (isAutoRun) {
-            startMarquee();
-        }
-    }
-
-    public void setMarqueeTime(long marqueeTime) {
-        this.marqueeTime = marqueeTime;
-        startMarquee();
-    }
-
-    public void startMarquee() {
-        stopMarquee = false;
-        requestLayout();
-        invalidate();
+        Log.d(TAG, "--stop marquee--");
     }
 
     private void initMarqueeAnimator() {
-        if (marqueeAnimator != null) {
-            marqueeAnimator.end();
-            marqueeAnimator = null;
+        if (marqueeWidth <= 0) {
+            Log.d(TAG, "--init marquee--width is 0 delay init!");
+            needInitAnimator = true;
+            return;
         }
+        Log.d(TAG, "--init marquee--success");
+        needInitAnimator = false;
         int marqueeNewWidth = (int) tvPaint.measureText(marqueeText);
         marqueeAnimator = ValueAnimator.ofInt(marqueeWidth, -marqueeNewWidth);
         if (marqueeTime <= 0) {
-            marqueeTime = 3000;
+            marqueeTime = 5000;
         }
         float multi = marqueeNewWidth * 1.0f / marqueeWidth * 1.0f;
         marqueeAnimator.setDuration((long) (marqueeTime * (1 + multi)));
@@ -119,6 +122,8 @@ public class MarqueeView extends View {
                 invalidate();
             }
         });
+        marqueeAnimator.start();
+        Log.d(TAG, "--start marquee--");
     }
 
     @Override
@@ -127,10 +132,10 @@ public class MarqueeView extends View {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
             return;
         }
-        int originWidth = View.MeasureSpec.getSize(widthMeasureSpec);
-        int originWidthMode = View.MeasureSpec.getMode(widthMeasureSpec);
-        int originHeight = View.MeasureSpec.getSize(heightMeasureSpec);
-        int originHeightMode = View.MeasureSpec.getSize(heightMeasureSpec);
+        int originWidth = MeasureSpec.getSize(widthMeasureSpec);
+        int originWidthMode = MeasureSpec.getMode(widthMeasureSpec);
+        int originHeight = MeasureSpec.getSize(heightMeasureSpec);
+        int originHeightMode = MeasureSpec.getSize(heightMeasureSpec);
         if (originWidth > 0 && originWidthMode == MeasureSpec.EXACTLY) {
             marqueeWidth = originWidth;
         } else {
@@ -142,9 +147,8 @@ public class MarqueeView extends View {
         } else {
             marqueeHeight = (int) tvPaint.getTextSize();
         }
-        int newWidthSpec = View.MeasureSpec.makeMeasureSpec(marqueeWidth, View.MeasureSpec.EXACTLY);
-        int newHeightSpec = View.MeasureSpec.makeMeasureSpec(marqueeHeight, View.MeasureSpec.EXACTLY);
-        initMarqueeAnimator();
+        int newWidthSpec = MeasureSpec.makeMeasureSpec(marqueeWidth, MeasureSpec.EXACTLY);
+        int newHeightSpec = MeasureSpec.makeMeasureSpec(marqueeHeight, MeasureSpec.EXACTLY);
         super.onMeasure(newWidthSpec, newHeightSpec);
     }
 
@@ -154,8 +158,8 @@ public class MarqueeView extends View {
         if (TextUtils.isEmpty(marqueeText) || stopMarquee) {
             return;
         }
-        if (marqueeAnimator != null && !marqueeAnimator.isRunning()) {
-            marqueeAnimator.start();
+        if (needInitAnimator) {
+            initMarqueeAnimator();
         }
         int baseY = (int) (canvas.getHeight() / 2 - (tvPaint.descent() + tvPaint.ascent()) / 2);
         canvas.drawText(marqueeText, marqueeX, baseY, tvPaint);
@@ -166,9 +170,19 @@ public class MarqueeView extends View {
         return spValue * fontScale + 0.5f;
     }
 
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        stopMarquee();
+    public int dip2px(int dpValue) {
+        float scale = getResources().getDisplayMetrics().density;
+        return (int) (dpValue * scale + 0.5f);
     }
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == GONE) {
+            stopMarquee();
+        } else if (visibility == VISIBLE) {
+            startMarquee();
+        }
+    }
+
 }
