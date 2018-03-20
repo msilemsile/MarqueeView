@@ -4,12 +4,15 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Shader;
 import android.support.annotation.Nullable;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -17,7 +20,7 @@ import android.view.animation.LinearInterpolator;
  * 跑马灯
  */
 
-public class MarqueeView extends View {
+public class MarqueeView extends View implements Choreographer.FrameCallback {
     private static final String TAG = "MarqueeView";
     private TextPaint tvPaint;
     private int textColor = Color.BLACK;
@@ -32,6 +35,12 @@ public class MarqueeView extends View {
     private ValueAnimator marqueeAnimator;
 
     private boolean needInitAnimator;
+    private Shader mLeftFadingShader;
+    private Shader mRightFadingShader;
+    private Paint mFadingPaint;
+    private int fadingLength = 38;
+
+    private Choreographer mChoreographer;
 
     public MarqueeView(Context context) {
         super(context);
@@ -53,6 +62,8 @@ public class MarqueeView extends View {
         tvPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         tvPaint.setColor(textColor);
         tvPaint.setTextSize(dip2px(textSize));
+        mFadingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mChoreographer = Choreographer.getInstance();
     }
 
     public void setTextColor(int textColor) {
@@ -68,17 +79,26 @@ public class MarqueeView extends View {
 
     public void setMarqueeTime(long marqueeTime) {
         this.marqueeTime = marqueeTime;
+        if (TextUtils.isEmpty(marqueeText)) {
+            return;
+        }
         stopMarquee();
         startMarquee();
     }
 
     public void setMarqueeText(String marqueeText) {
         this.marqueeText = marqueeText;
+        if (TextUtils.isEmpty(marqueeText)) {
+            return;
+        }
         stopMarquee();
         startMarquee();
     }
 
     public void startMarquee() {
+        if (TextUtils.isEmpty(marqueeText)) {
+            return;
+        }
         stopMarquee = false;
         needInitAnimator = true;
         initMarqueeAnimator();
@@ -93,6 +113,7 @@ public class MarqueeView extends View {
             marqueeAnimator = null;
         }
         marqueeX = 0;
+        mChoreographer.removeFrameCallback(this);
         Log.d(TAG, "--stop marquee--");
     }
 
@@ -114,15 +135,8 @@ public class MarqueeView extends View {
         marqueeAnimator.setRepeatMode(ValueAnimator.RESTART);
         marqueeAnimator.setRepeatCount(ValueAnimator.INFINITE);
         marqueeAnimator.setInterpolator(new LinearInterpolator());
-        marqueeAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                Integer integer = (Integer) animation.getAnimatedValue();
-                marqueeX = integer;
-                invalidate();
-            }
-        });
         marqueeAnimator.start();
+        mChoreographer.postFrameCallback(this);
         Log.d(TAG, "--start marquee--");
     }
 
@@ -163,6 +177,25 @@ public class MarqueeView extends View {
         }
         int baseY = (int) (canvas.getHeight() / 2 - (tvPaint.descent() + tvPaint.ascent()) / 2);
         canvas.drawText(marqueeText, marqueeX, baseY, tvPaint);
+        //draw fading edge
+        initFadingShader();
+        mFadingPaint.setShader(mLeftFadingShader);
+        canvas.drawPaint(mFadingPaint);
+        mFadingPaint.setShader(mRightFadingShader);
+        canvas.drawPaint(mFadingPaint);
+    }
+
+    private void initFadingShader() {
+        int width = getWidth();
+        int height = getHeight();
+        if (width == 0 || height == 0) {
+            return;
+        }
+        if (mLeftFadingShader != null) {
+            return;
+        }
+        mLeftFadingShader = new LinearGradient(0, height / 2, fadingLength, height / 2, Color.WHITE, 0x00000000, Shader.TileMode.CLAMP);
+        mRightFadingShader = new LinearGradient(width, height / 2, width - fadingLength, height / 2, Color.WHITE, 0x00000000, Shader.TileMode.CLAMP);
     }
 
     private float sp2px(int spValue) {
@@ -182,6 +215,20 @@ public class MarqueeView extends View {
             stopMarquee();
         } else if (visibility == VISIBLE) {
             startMarquee();
+        }
+    }
+
+    @Override
+    public void doFrame(long frameTimeNanos) {
+        mChoreographer.removeFrameCallback(this);
+        if (marqueeAnimator == null) {
+            return;
+        }
+        Integer integer = (Integer) marqueeAnimator.getAnimatedValue();
+        if (integer != null) {
+            marqueeX = integer;
+            invalidate();
+            mChoreographer.postFrameCallback(this);
         }
     }
 

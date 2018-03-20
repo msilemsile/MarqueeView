@@ -4,11 +4,14 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Shader
 import android.text.TextPaint
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.Log
+import android.view.Choreographer
 import android.view.View
 import android.view.animation.LinearInterpolator
 
@@ -16,7 +19,7 @@ import android.view.animation.LinearInterpolator
  * 跑马灯
  */
 
-class MarqueeView : View {
+class MarqueeView : View, Choreographer.FrameCallback {
     private var tvPaint: TextPaint? = null
     private var textColor = Color.BLACK
     private var textSize = 12
@@ -30,6 +33,12 @@ class MarqueeView : View {
     private var marqueeAnimator: ValueAnimator? = null
 
     private var needInitAnimator: Boolean = false
+    private var mLeftFadingShader: Shader? = null
+    private var mRightFadingShader: Shader? = null
+    private var mFadingPaint: Paint? = null
+    private val fadingLength = 38
+
+    private var mChoreographer: Choreographer? = null
 
     constructor(context: Context) : super(context) {
         init()
@@ -48,6 +57,8 @@ class MarqueeView : View {
         tvPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
         tvPaint!!.color = textColor
         tvPaint!!.textSize = dip2px(textSize)
+        mFadingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        mChoreographer = Choreographer.getInstance()
     }
 
     fun setTextColor(textColor: Int) {
@@ -63,17 +74,26 @@ class MarqueeView : View {
 
     fun setMarqueeTime(marqueeTime: Long) {
         this.marqueeTime = marqueeTime
+        if (TextUtils.isEmpty(marqueeText)) {
+            return
+        }
         stopMarquee()
         startMarquee()
     }
 
     fun setMarqueeText(marqueeText: String) {
         this.marqueeText = marqueeText
+        if (TextUtils.isEmpty(marqueeText)) {
+            return
+        }
         stopMarquee()
         startMarquee()
     }
 
     fun startMarquee() {
+        if (TextUtils.isEmpty(marqueeText)) {
+            return
+        }
         stopMarquee = false
         needInitAnimator = true
         initMarqueeAnimator()
@@ -88,6 +108,7 @@ class MarqueeView : View {
             marqueeAnimator = null
         }
         marqueeX = 0
+        mChoreographer!!.removeFrameCallback(this)
         Log.d(TAG, "--stop marquee--")
     }
 
@@ -109,12 +130,8 @@ class MarqueeView : View {
         marqueeAnimator!!.repeatMode = ValueAnimator.RESTART
         marqueeAnimator!!.repeatCount = ValueAnimator.INFINITE
         marqueeAnimator!!.interpolator = LinearInterpolator()
-        marqueeAnimator!!.addUpdateListener { animation ->
-            val integer = animation.animatedValue as Int
-            marqueeX = integer
-            invalidate()
-        }
         marqueeAnimator!!.start()
+        mChoreographer!!.postFrameCallback(this)
         Log.d(TAG, "--start marquee--")
     }
 
@@ -127,16 +144,16 @@ class MarqueeView : View {
         val originWidthMode = View.MeasureSpec.getMode(widthMeasureSpec)
         val originHeight = View.MeasureSpec.getSize(heightMeasureSpec)
         val originHeightMode = View.MeasureSpec.getSize(heightMeasureSpec)
-        marqueeWidth = if (originWidth > 0 && originWidthMode == View.MeasureSpec.EXACTLY) {
-            originWidth
+        if (originWidth > 0 && originWidthMode == View.MeasureSpec.EXACTLY) {
+            marqueeWidth = originWidth
         } else {
-            tvPaint!!.measureText(marqueeText).toInt()
+            marqueeWidth = tvPaint!!.measureText(marqueeText).toInt()
         }
         val marqueeHeight: Int
-        marqueeHeight = if (originHeight > 0 && originHeightMode == View.MeasureSpec.EXACTLY) {
-            originHeight
+        if (originHeight > 0 && originHeightMode == View.MeasureSpec.EXACTLY) {
+            marqueeHeight = originHeight
         } else {
-            tvPaint!!.textSize.toInt()
+            marqueeHeight = tvPaint!!.textSize.toInt()
         }
         val newWidthSpec = View.MeasureSpec.makeMeasureSpec(marqueeWidth, View.MeasureSpec.EXACTLY)
         val newHeightSpec = View.MeasureSpec.makeMeasureSpec(marqueeHeight, View.MeasureSpec.EXACTLY)
@@ -153,6 +170,25 @@ class MarqueeView : View {
         }
         val baseY = (canvas.height / 2 - (tvPaint!!.descent() + tvPaint!!.ascent()) / 2).toInt()
         canvas.drawText(marqueeText!!, marqueeX.toFloat(), baseY.toFloat(), tvPaint!!)
+        //draw fading edge
+        initFadingShader()
+        mFadingPaint!!.shader = mLeftFadingShader
+        canvas.drawPaint(mFadingPaint!!)
+        mFadingPaint!!.shader = mRightFadingShader
+        canvas.drawPaint(mFadingPaint!!)
+    }
+
+    private fun initFadingShader() {
+        val width = width
+        val height = height
+        if (width == 0 || height == 0) {
+            return
+        }
+        if (mLeftFadingShader != null) {
+            return
+        }
+        mLeftFadingShader = LinearGradient(0f, (height / 2).toFloat(), fadingLength.toFloat(), (height / 2).toFloat(), Color.WHITE, 0x00000000, Shader.TileMode.CLAMP)
+        mRightFadingShader = LinearGradient(width.toFloat(), (height / 2).toFloat(), (width - fadingLength).toFloat(), (height / 2).toFloat(), Color.WHITE, 0x00000000, Shader.TileMode.CLAMP)
     }
 
     private fun sp2px(spValue: Int): Float {
@@ -174,8 +210,21 @@ class MarqueeView : View {
         }
     }
 
+    override fun doFrame(frameTimeNanos: Long) {
+        mChoreographer!!.removeFrameCallback(this)
+        if (marqueeAnimator == null) {
+            return
+        }
+        val integer = marqueeAnimator!!.animatedValue as Int
+        if (integer != null) {
+            marqueeX = integer
+            invalidate()
+            mChoreographer!!.postFrameCallback(this)
+        }
+    }
+
     companion object {
-        private val TAG = "MarqueeView"
+        private const val TAG = "MarqueeView"
     }
 
 }
