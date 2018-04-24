@@ -1,4 +1,9 @@
-# MarqueeView
+# Use
+
+```
+MarqueeView.setMarqueeText(xxxx)
+```
+
 跑马灯....
 
 
