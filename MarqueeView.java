@@ -1,11 +1,10 @@
-package com.xk.span.zutuan.common.ui.widget;
+
 
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
+import android.graphics.LinearGradienmport android.graphics.Paint;
 import android.graphics.Shader;
 import android.support.annotation.Nullable;
 import android.text.TextPaint;
